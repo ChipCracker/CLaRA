@@ -1,0 +1,48 @@
+# OSWS Output & Build Artifacts
+out/
+build/
+*.bak*
+indent.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+
+# LaTeX Intermediate Files (if built locally outside docker)
+*.aux
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.toc
+*.lot
+*.lof
+*.bbl
+*.blg
+*.nav
+*.snm
+*.vrb
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editors / IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+.docker/
+
+# Secrets
+.env
+.env.*
+! .env.example
