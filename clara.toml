@@ -1,0 +1,26 @@
+[languages]
+primary = "de-DE"
+secondary = ["en-US"]
+
+[llm]
+# LM Studio (OpenAI-Style) – Example-Config
+provider = "lm-studio"  # or "openai" / "lm-studio" / "ollama"
+model = "nvidia/nemotron-3-nano"
+api_url = "http://host.docker.internal:1234/v1" # Use host.docker.internal for Mac/Docker Desktop
+timeout_seconds = 180
+
+# Ollama
+#[llm]
+#provider = "ollama"
+#model = "qwen3:4b"
+#max_tokens = 256
+#temperature = 0.2
+#timeout_seconds = 600
+
+[checks]
+enable_codespell = false
+severity_threshold = "warning"  # Hook exits ≥ warning
+
+[paths]
+include = ["**/*.tex", "**/*.bib"]
+exclude = ["build/**", "out/**", "vendor/**", "test_hook.tex"]
