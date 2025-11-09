@@ -1,0 +1,39 @@
+services:
+  core:
+    build:
+      context: .
+      dockerfile: docker/core.Dockerfile
+    volumes:
+      - .:/work
+      - clara-cache:/root/.cache
+    working_dir: /work
+    depends_on:
+      languagetool:
+        condition: service_started
+      ollama:
+        condition: service_started
+    environment:
+      - LT_URL=http://languagetool:8010
+      - OLLAMA_URL=http://ollama:11434
+    command: ["python", "-m", "clara.cli"]
+
+  languagetool:
+    build:
+      context: .
+      dockerfile: docker/languagetool.Dockerfile
+    environment:
+      - Java_Xms=512m
+      - Java_Xmx=2048m
+    ports:
+      - "8010:8010"
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-models:/root/.ollama
+    ports:
+      - "11434:11434"
+
+volumes:
+  clara-cache:
+  ollama-models:
