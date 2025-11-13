@@ -1,0 +1,4 @@
+defaultIndent: '  '
+modifyLineBreaks: true
+lookForAlignDelims:
+  tabular: 0

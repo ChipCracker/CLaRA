@@ -1,0 +1,4 @@
+# Suppress line break false positives after \\ (Warning 8) and math mode spacing (Warning 36).
+Warning 8 Off
+Warning 36 Off
+Warning 20 Off
