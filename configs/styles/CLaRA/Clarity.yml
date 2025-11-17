@@ -1,0 +1,7 @@
+extends: substitution
+message: "Vermeide Füllwort '{{ match }}' für präzisere Formulierungen."
+ignorecase: true
+level: suggestion
+swap:
+  einfach: ""
+  grundsätzlich: ""
