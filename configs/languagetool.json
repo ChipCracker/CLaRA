@@ -1,0 +1,21 @@
+{
+  "language": "de-DE",
+  "enabledRules": [],
+  "disabledRules": [
+    "WHITESPACE_RULE"
+  ],
+  "ignoreWords": [
+    "chktex",
+    "ChkTeX",
+    "vale",
+    "Vale",
+    "LanguageTool",
+    "LLM",
+    "CLaRA",
+    "SWS",
+    "make",
+    "build",
+    "pre-commit"
+  ],
+  "motherTongue": "de-DE"
+}
