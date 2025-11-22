@@ -1,0 +1,46 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[ngerman]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{csquotes}
+\usepackage{amsmath}
+\usepackage{hyperref}
+
+\title{Continuous LaTeX Review Assistant (CLaRA)}
+\author{CLaRA-Team}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+  Dieses Dokument dient als Schnelltest für die PDF-Erstellung.
+  Es enthält Fließtext, Mathematik und eine Tabelle.
+\end{abstract}
+
+\section{Einführung}
+Ziel ist eine reproduzierbare Werkzeugkette, die LaTeX-Dokumente lokal prüft. Die Suite kombiniert \emph{ChkTeX}, \emph{Vale}, \emph{LanguageTool} und optionale LLM-Hinweise.
+% clara: ignore-next-line
+Na ja das geht schoon.
+
+\section{Beispiel}
+Eine kurze Formel: \(f(x) = x^2 + \int_0^1 t\,dt\).
+
+\input{sections/unter}
+
+\begin{table}[h]
+  \centering
+  \begin{tabular}{l r}
+    \textbf{Werkzeug} & \textbf{Version} \\
+    ChkTeX & 1.7 \\
+    Vale & 3.6.0 \\
+  \end{tabular}
+  \caption{Kernwerkzeuge der Suite.}
+\end{table}
+
+\section{Zusätzlicher Abschnitt}
+Dieser Absatz ist bewusst einfach gehalten und soll zeigen, dass das Dokument fehlerfrei kompiliert. Er dient als Platzhalter für weitere Inhalte.
+Das ist ein absichtlicher Tippfehler. % CLaRA-FIX: Das Wort 'aabsichtlicher' wird korrigiert zu 'absichtlicher', das ist die kürzeste passende Suggestion und bildet den korrekten deutschen Begriff.
+\end{document}
