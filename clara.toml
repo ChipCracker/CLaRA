@@ -1,6 +1,6 @@
 [languages]
-primary = "de-DE"
-secondary = ["en-US"]
+primary = "en-US"
+secondary = ["de-DE"]
 
 [llm]
 # LM Studio (OpenAI-Style) – Example-Config

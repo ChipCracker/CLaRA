@@ -1,5 +1,5 @@
 {
-  "language": "de-DE",
+  "language": "en-US",
   "enabledRules": [],
   "disabledRules": [
     "WHITESPACE_RULE"
@@ -17,5 +17,5 @@
     "build",
     "pre-commit"
   ],
-  "motherTongue": "de-DE"
+  "motherTongue": "en-US"
 }

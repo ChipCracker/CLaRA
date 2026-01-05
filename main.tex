@@ -1,7 +1,7 @@
 \documentclass[11pt]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
-\usepackage[ngerman]{babel}
+\usepackage[english]{babel}
 \usepackage{lmodern}
 \usepackage{microtype}
 \usepackage{csquotes}
@@ -16,31 +16,31 @@
 \maketitle
 
 \begin{abstract}
-  Dieses Dokument dient als Schnelltest für die PDF-Erstellung.
-  Es enthält Fließtext, Mathematik und eine Tabelle.
+  This document is a quick sanity check for PDF generation.
+  It contains prose, math, and a table.
 \end{abstract}
 
-\section{Einführung}
-Ziel ist eine reproduzierbare Werkzeugkette, die LaTeX-Dokumente lokal prüft. Die Suite kombiniert \emph{ChkTeX}, \emph{Vale}, \emph{LanguageTool} und optionale LLM-Hinweise.
+\section{Introduction}
+The goal is a reproducible toolchain that checks LaTeX documents locally. The suite combines \emph{ChkTeX}, \emph{Vale}, \emph{LanguageTool}, and optional LLM-assisted hints.
 % clara: ignore-next-line
-Na ja das geht schoon.
+Well, thats definately fine.
 
-\section{Beispiel}
-Eine kurze Formel: \(f(x) = x^2 + \int_0^1 t\,dt\).
+\section{Example}
+A short formula: \(f(x) = x^2 + \int_0^1 t\,dt\).
 
 \input{sections/unter}
 
 \begin{table}[h]
   \centering
   \begin{tabular}{l r}
-    \textbf{Werkzeug} & \textbf{Version} \\
+    \textbf{Tool} & \textbf{Version} \\
     ChkTeX & 1.7 \\
     Vale & 3.6.0 \\
   \end{tabular}
-  \caption{Kernwerkzeuge der Suite.}
+  \caption{Core tools in the suite.}
 \end{table}
 
-\section{Zusätzlicher Abschnitt}
-Dieser Absatz ist bewusst einfach gehalten und soll zeigen, dass das Dokument fehlerfrei kompiliert. Er dient als Platzhalter für weitere Inhalte.
-Das ist ein absichtlicher Tippfehler. % CLaRA-FIX: Das Wort 'aabsichtlicher' wird korrigiert zu 'absichtlicher', das ist die kürzeste passende Suggestion und bildet den korrekten deutschen Begriff.
+\section{Additional Section}
+This paragraph is intentionally simple and is meant to show that the document compiles cleanly. It serves as a placeholder for more content.
+This is an intential typo. % CLaRA-FIX: corrected 'intential' → 'intentional'
 \end{document}
