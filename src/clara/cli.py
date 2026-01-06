@@ -5,13 +5,23 @@ import fnmatch
 import json
 import sys
 from pathlib import Path
-from typing import Iterable, List, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
 
 from .config import ClaraConfig, load_config
 from .extract import extract_segments
 from .report import normalize, summarize
 from .suppressions import apply_suppressions
 from . import adapters
+from .cache import (
+    ReviewCache,
+    analyze_file_changes,
+    build_cache_from_results,
+    get_cached_issues_for_unchanged,
+    get_lines_needing_check,
+    load_cache,
+    save_cache,
+    DEFAULT_CACHE_PATH,
+)
 
 
 def main() -> None:
@@ -59,18 +69,29 @@ def main() -> None:
     if args.cmd in ("review-auto", "review-fix"):
         adapters.latexindent.fix(files, cfg)
 
-    issues = []
-    issues += adapters.latexindent.run(files, cfg)
-    issues += adapters.chktex.run(files, cfg)
-    issues += adapters.vale.run(files, cfg)
-    if cfg.checks.enable_codespell:
-        issues += adapters.codespell.run(files, cfg)
-    issues += adapters.languagetool.run(files, cfg, url_env="LT_URL")
+    # Load cache for review-auto (automatic incremental mode)
+    cache: Optional[ReviewCache] = None
+    if args.cmd == "review-auto":
+        cache = load_cache(DEFAULT_CACHE_PATH)
+        if cache:
+            print(f"[cache] Loaded cache with {len(cache.files)} file(s)")
+
+    # Run checks (incremental if cache exists, otherwise full)
+    if args.cmd == "review-auto" and cache:
+        issues = run_incremental_checks(files, cfg, cache)
+    else:
+        issues = []
+        issues += adapters.latexindent.run(files, cfg)
+        issues += adapters.chktex.run(files, cfg)
+        issues += adapters.vale.run(files, cfg)
+        if cfg.checks.enable_codespell:
+            issues += adapters.codespell.run(files, cfg)
+        issues += adapters.languagetool.run(files, cfg, url_env="LT_URL")
 
     run_llm = args.with_llm and not args.fast
     if args.cmd == "review-fix":
         run_llm = True
-    if args.cmd == "review-auto":
+    if args.cmd == "review-auto" and not cache:
         run_llm = True
 
     if run_llm:
@@ -115,6 +136,10 @@ def main() -> None:
         summary = summarize(accepted)
         result = {"version": "1.0", "summary": summary, "issues": normalized}
         output_json(result, args.json_out)
+        # Save cache for incremental mode
+        new_cache = build_cache_from_results(files, normalized)
+        save_cache(new_cache, DEFAULT_CACHE_PATH)
+        print(f"[cache] Saved cache for {len(files)} file(s)")
     else:
         normalized = [normalize(issue) for issue in issues]
         active = apply_suppressions(normalized)
@@ -165,6 +190,76 @@ def output_json(payload: dict, destination: str | None) -> None:
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     else:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+
+def run_incremental_checks(
+    files: List[Path],
+    cfg: ClaraConfig,
+    cache: Optional[ReviewCache],
+) -> List[Dict[str, Any]]:
+    """Run checks incrementally, using cache for unchanged lines."""
+    all_issues: List[Dict[str, Any]] = []
+    files_to_check: List[Path] = []
+    file_changes: Dict[str, List[Any]] = {}
+    cached_files: Dict[str, Any] = {}
+
+    # Phase 1: Analyze all files for changes
+    for file_path in files:
+        changes, cached_file, needs_check = analyze_file_changes(file_path, cache)
+
+        if not needs_check and cached_file:
+            # File unchanged - load all issues from cache
+            cached_count = 0
+            for line_no, cached_line in cached_file.lines.items():
+                for issue in cached_line.issues:
+                    all_issues.append(issue.to_full_issue(str(file_path), line_no))
+                    cached_count += 1
+            print(f"[cache] {file_path}: unchanged, {cached_count} cached issues")
+        else:
+            files_to_check.append(file_path)
+            file_changes[str(file_path)] = changes
+            if cached_file:
+                cached_files[str(file_path)] = cached_file
+
+    if not files_to_check:
+        print("[cache] No changes detected, using cached results.")
+        return all_issues
+
+    print(f"[cache] Checking {len(files_to_check)} changed file(s)...")
+
+    # Phase 2: Run adapters on files that need checking
+    fresh_issues: List[Dict[str, Any]] = []
+    fresh_issues += adapters.latexindent.run(files_to_check, cfg)
+    fresh_issues += adapters.chktex.run(files_to_check, cfg)
+    fresh_issues += adapters.vale.run(files_to_check, cfg)
+    if cfg.checks.enable_codespell:
+        fresh_issues += adapters.codespell.run(files_to_check, cfg)
+    fresh_issues += adapters.languagetool.run(files_to_check, cfg, url_env="LT_URL")
+
+    # Phase 3: Filter fresh issues and merge with cached
+    for file_path in files_to_check:
+        path_str = str(file_path)
+        changes = file_changes.get(path_str, [])
+        cached_file = cached_files.get(path_str)
+        changed_lines = get_lines_needing_check(changes)
+
+        # Fresh issues for changed lines only
+        fresh_count = 0
+        for issue in fresh_issues:
+            if issue.get("file") == path_str and issue.get("line") in changed_lines:
+                all_issues.append(issue)
+                fresh_count += 1
+
+        # Cached issues for unchanged lines
+        cached_count = 0
+        if cached_file:
+            cached_issues = get_cached_issues_for_unchanged(path_str, changes, cached_file)
+            all_issues.extend(cached_issues)
+            cached_count = len(cached_issues)
+
+        print(f"[cache] {file_path}: {fresh_count} new, {cached_count} cached")
+
+    return all_issues
 
 
 if __name__ == "__main__":
