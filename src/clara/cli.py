@@ -91,11 +91,17 @@ def main() -> None:
         annotate_llm_comments(active, cfg, files=[str(p) for p in files])
     elif args.cmd == "review-auto":
         from .adjudicate import adjudicate_issues
-        from .fixer import apply_adjudicated_fixes, annotate_llm_comments
+        from .fixer import apply_adjudicated_fixes, annotate_llm_comments, apply_fixes_from_issues
         normalized = [normalize(issue) for issue in issues]
         active = apply_suppressions(normalized)
         adjudicated = adjudicate_issues(active, cfg)
         apply_adjudicated_fixes(adjudicated)
+        accepted_non_llm = [
+            issue for issue in adjudicated
+            if issue.get("tool") != "llm"
+            and (issue.get("adjudication") or {}).get("accept")
+        ]
+        apply_fixes_from_issues(accepted_non_llm, cfg)
         llm_issues = [i for i in adjudicated if i.get("tool") == "llm"]
         annotate_llm_comments(llm_issues, cfg, files=[str(p) for p in files])
         accepted = []

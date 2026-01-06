@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import re
+import difflib
 from pathlib import Path
 from typing import List, Dict, Any, Iterable
 
 from .config import ClaraConfig
+from .prompts import load_prompt
 
 ANNOTATION_PREFIX = "CLaRA-LLM"
 MAX_ANNOTATION_LEN = 160
@@ -44,7 +46,7 @@ def apply_fixes_from_issues(issues: Iterable[Dict[str, Any]], cfg: ClaraConfig) 
     fixable_issues = [
         i for i in issues
         if not i.get("suppressed")
-        and i.get("tool") not in ("llm", "latexindent", "chktex")
+        and i.get("tool") in ("languagetool", "codespell")
         and i.get("file")
         and i.get("line")
     ]
@@ -142,8 +144,7 @@ def _process_file(fname: str, issues: List[Dict], cfg: ClaraConfig):
         lines_issues[ln].append(i)
 
     # Load prompt
-    prompt_path = Path("configs/prompt_fix.txt")
-    system_prompt = prompt_path.read_text(encoding="utf-8") if prompt_path.exists() else "Fix the error."
+    system_prompt = load_prompt("prompt_fix", cfg, default="Fix the error.")
 
     # Iterate over affected lines (descending order)
     for line_idx in sorted(lines_issues.keys(), reverse=True):
@@ -180,7 +181,10 @@ def _process_file(fname: str, issues: List[Dict], cfg: ClaraConfig):
             if "\n" in fixed_text:
                 print("  Skipped (multi-line response)")
             elif fixed_text:
-                lines[line_idx] = fixed_text.strip()
+                if _is_safe_fix(original_text, fixed_text):
+                    lines[line_idx] = fixed_text.strip()
+                else:
+                    print("  Skipped (unsafe fix)")
             else:
                 print(f"  Skipped (empty response)")
                 
@@ -339,6 +343,36 @@ def _build_fix_inline_comment(issue: Dict[str, Any], original: str, fixed: str) 
         comment = "korrigiert"
     comment = _truncate_comment(comment)
     return f"% {FIX_PREFIX}: {comment}"
+
+
+def _is_safe_fix(original: str, fixed: str) -> bool:
+    if not fixed or fixed == original:
+        return False
+    fixed = fixed.strip()
+    original = original.rstrip()
+    if not fixed:
+        return False
+    if original.lstrip().startswith("\\"):
+        return False
+    if "%" in fixed and "%" not in original:
+        return False
+    if original.count("{") != fixed.count("{") or original.count("}") != fixed.count("}"):
+        return False
+    if original.count("$") != fixed.count("$"):
+        return False
+    if _latex_commands(original) != _latex_commands(fixed):
+        return False
+    ratio = difflib.SequenceMatcher(a=original, b=fixed).ratio()
+    if ratio < 0.85:
+        return False
+    max_delta = max(10, int(len(original) * 0.15))
+    if abs(len(fixed) - len(original)) > max_delta:
+        return False
+    return True
+
+
+def _latex_commands(text: str) -> list[str]:
+    return re.findall(r"\\[A-Za-z@]+", text)
 
 
 def _call_llm_for_fix(cfg: ClaraConfig, sys_prompt: str, user_msg: str) -> str:

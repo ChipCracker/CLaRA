@@ -54,7 +54,8 @@ def run(files: Iterable[Path], cfg, url_env: str | None = None) -> List[dict]:
             continue
 
         if ignore_words:
-            plain_text = _mask_ignore_words(plain_text, ignore_words)
+            replacement = "Term" if str(cfg.languages.primary).lower().startswith("en") else "Begriff"
+            plain_text = _mask_ignore_words(plain_text, ignore_words, replacement=replacement)
         plain_text = _cleanup_plain_text(plain_text)
 
         params = {
@@ -167,7 +168,7 @@ def _mask_non_newline(text: str) -> str:
     return re.sub(r"[^\n]", " ", text)
 
 
-def _mask_ignore_words(text: str, words: List[str], replacement: str = "Begriff") -> str:
+def _mask_ignore_words(text: str, words: List[str], replacement: str) -> str:
     masked = text
     for word in words:
         if not word:

@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 import os
 import httpx
-from pathlib import Path
 from typing import Iterable, List
 
 from ..extract import Segment
+from ..prompts import load_prompt
 
 
 def run(segments: Iterable[Segment], cfg, url_env: str | None = None) -> List[dict]:
@@ -15,8 +15,7 @@ def run(segments: Iterable[Segment], cfg, url_env: str | None = None) -> List[di
     base_url = cfg.llm.api_url or os.getenv(url_env, "http://localhost:1234/v1")
     url = f"{base_url.rstrip('/')}/chat/completions"
 
-    prompt_path = Path("configs/prompt_clarity.txt")
-    system_prompt = prompt_path.read_text(encoding="utf-8") if prompt_path.exists() else "You are a helpful editor."
+    system_prompt = load_prompt("prompt_clarity", cfg, default="You are a helpful editor.")
 
     issues = []
 

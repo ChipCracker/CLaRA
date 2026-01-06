@@ -8,12 +8,12 @@ from typing import Any, Dict, Iterable, List, Tuple
 import httpx
 
 from .config import ClaraConfig
+from .prompts import load_prompt, spellcheck_fix_prompt
 
 
 def adjudicate_issues(issues: Iterable[Dict[str, Any]], cfg: ClaraConfig) -> List[Dict[str, Any]]:
     """Use LLM to accept/reject tool issues and optionally provide fixes."""
-    prompt_path = Path("configs/prompt_adjudicate.txt")
-    system_prompt = prompt_path.read_text(encoding="utf-8") if prompt_path.exists() else ""
+    system_prompt = load_prompt("prompt_adjudicate", cfg, default="")
 
     results: List[Dict[str, Any]] = []
     for issue in issues:
@@ -90,19 +90,7 @@ def _needs_spellcheck_fix(issue: Dict[str, Any], decision: Dict[str, Any]) -> bo
 
 
 def _call_spellcheck_fix_only(issue: Dict[str, Any], line_text: str, cfg: ClaraConfig) -> Dict[str, Any] | None:
-    system_prompt = (
-        "Rolle: Korrektor.\n"
-        "Ziel: Rechtschreibfehler beheben.\n"
-        "Ausgabe: Genau ein JSON-Objekt:\n"
-        '{ "accept": true, "fix": "...", "comment": "..." }\n'
-        "Regeln:\n"
-        "- accept muss true sein.\n"
-        "- fix ist die komplette korrigierte Zeile (nicht leer).\n"
-        "- Ändere ausschließlich ein einzelnes Wort in der Zeile, basierend auf den Suggestions.\n"
-        "- Wenn mehrere Suggestions passen: wähle die kürzeste plausible Suggestion.\n"
-        "- Beispiel: In 'Das ___ ein Beispiel.' ist 'ist' plausibler als 'isst'.\n"
-        "- Keine Zusatztexte.\n"
-    )
+    system_prompt = spellcheck_fix_prompt(cfg)
     payload = {
         "code": issue.get("code"),
         "suggestion": issue.get("suggestion"),
