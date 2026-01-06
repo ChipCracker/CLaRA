@@ -54,8 +54,8 @@ Example (excerpt):
 
 ```toml
 [languages]
-primary = "de-DE"
-secondary = ["en-US"]
+primary = "en-US"
+secondary = ["de-DE"]
 
 [llm]
 provider = "ollama" # or "openai" / "lm-studio" / "ollama"
