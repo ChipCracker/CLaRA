@@ -22,5 +22,5 @@ enable_codespell = false
 severity_threshold = "warning"  # Hook exits ≥ warning
 
 [paths]
-include = ["**/*.tex", "**/*.bib"]
-exclude = ["build/**", "out/**", "vendor/**", "test_hook.tex"]
+include = ["tex/**/*.tex", "tex/**/*.bib"]
+exclude = ["build/**", "out/**", "vendor/**"]

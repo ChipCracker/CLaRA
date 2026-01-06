@@ -56,7 +56,7 @@ clean:
 	find . -name "*.bak*" -delete
 
 build:
-	docker compose run --rm core tectonic -X compile $(PROJECT)/main.tex --outdir out
+	docker compose run --rm core tectonic -X compile tex/main.tex --outdir out
 
 report:
 	jq '.' out/review.json
