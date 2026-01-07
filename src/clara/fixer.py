@@ -182,7 +182,12 @@ def _process_file(fname: str, issues: List[Dict], cfg: ClaraConfig):
                 print("  Skipped (multi-line response)")
             elif fixed_text:
                 if _is_safe_fix(original_text, fixed_text, cfg):
-                    lines[line_idx] = fixed_text.strip()
+                    # Build comment: <original> -> <fixed>
+                    comment_text = f"{original_text.strip()} -> {fixed_text.strip()}"
+                    comment_text = _truncate_comment(comment_text, max_len=200)
+                    # Insert comment above the fixed line, then the fixed line
+                    lines[line_idx] = f"% {FIX_PREFIX}: {comment_text}\n{fixed_text.strip()}"
+                    print(f"  Fixed (added comment)")
                 else:
                     print("  Skipped (unsafe fix)")
             else:
@@ -273,10 +278,10 @@ def _sanitize_comment(text: str) -> str:
     return re.sub(r"\s+", " ", str(text)).strip()
 
 
-def _truncate_comment(text: str) -> str:
-    if len(text) <= MAX_ANNOTATION_LEN:
+def _truncate_comment(text: str, max_len: int = MAX_ANNOTATION_LEN) -> str:
+    if len(text) <= max_len:
         return text
-    return text[: MAX_ANNOTATION_LEN - 1].rstrip() + "…"
+    return text[: max_len - 1].rstrip() + "…"
 
 
 def _build_inline_comment(issues: List[Dict[str, Any]]) -> str:
