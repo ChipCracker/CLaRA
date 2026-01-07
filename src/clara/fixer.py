@@ -181,7 +181,7 @@ def _process_file(fname: str, issues: List[Dict], cfg: ClaraConfig):
             if "\n" in fixed_text:
                 print("  Skipped (multi-line response)")
             elif fixed_text:
-                if _is_safe_fix(original_text, fixed_text):
+                if _is_safe_fix(original_text, fixed_text, cfg):
                     lines[line_idx] = fixed_text.strip()
                 else:
                     print("  Skipped (unsafe fix)")
@@ -345,7 +345,7 @@ def _build_fix_inline_comment(issue: Dict[str, Any], original: str, fixed: str) 
     return f"% {FIX_PREFIX}: {comment}"
 
 
-def _is_safe_fix(original: str, fixed: str) -> bool:
+def _is_safe_fix(original: str, fixed: str, cfg: ClaraConfig) -> bool:
     if not fixed or fixed == original:
         return False
     fixed = fixed.strip()
@@ -363,9 +363,9 @@ def _is_safe_fix(original: str, fixed: str) -> bool:
     if _latex_commands(original) != _latex_commands(fixed):
         return False
     ratio = difflib.SequenceMatcher(a=original, b=fixed).ratio()
-    if ratio < 0.85:
+    if ratio < cfg.fixer.safety_ratio:
         return False
-    max_delta = max(10, int(len(original) * 0.15))
+    max_delta = max(10, int(len(original) * cfg.fixer.max_length_delta_ratio))
     if abs(len(fixed) - len(original)) > max_delta:
         return False
     return True

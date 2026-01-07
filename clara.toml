@@ -21,6 +21,10 @@ timeout_seconds = 180
 enable_codespell = false
 severity_threshold = "warning"  # Hook exits ≥ warning
 
+[fixer]
+safety_ratio = 0.0              # Min similarity (0.0-1.0) for auto-fix; lower = more aggressive
+max_length_delta_ratio = 1.0    # Max length change ratio (0.0-1.0); higher = allow bigger changes
+
 [paths]
 include = ["tex/**/*.tex", "tex/**/*.bib"]
 exclude = ["build/**", "out/**", "vendor/**"]

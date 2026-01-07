@@ -31,11 +31,17 @@ class LanguagesConfig(BaseModel):
     secondary: List[str] = Field(default_factory=list)
 
 
+class FixerConfig(BaseModel):
+    safety_ratio: float = Field(default=0.85, ge=0.0, le=1.0)
+    max_length_delta_ratio: float = Field(default=0.15, ge=0.0, le=1.0)
+
+
 class ClaraConfig(BaseModel):
     languages: LanguagesConfig
     llm: LLMConfig
     checks: ChecksConfig
     paths: PathsConfig
+    fixer: FixerConfig = Field(default_factory=FixerConfig)
 
 
 def load_config(path: str | Path) -> ClaraConfig:

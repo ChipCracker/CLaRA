@@ -17,6 +17,7 @@ from .cache import (
     analyze_file_changes,
     build_cache_from_results,
     get_cached_issues_for_unchanged,
+    get_cached_llm_issues,
     get_lines_needing_check,
     load_cache,
     save_cache,
@@ -94,12 +95,31 @@ def main() -> None:
     if args.cmd == "review-auto" and not cache:
         run_llm = True
 
+    # Track all segments for cache building (even if LLM doesn't run)
+    all_segments = extract_segments(files, cfg) if run_llm or args.cmd == "review-auto" else []
+
     if run_llm:
-        segments = extract_segments(files, cfg)
-        if cfg.llm.provider == "ollama":
-            issues += adapters.ollama.run(segments, cfg, url_env="OLLAMA_URL")
-        elif cfg.llm.provider in ("openai", "lm-studio"):
-            issues += adapters.openai.run(segments, cfg, url_env="OPENAI_URL")
+        # Filter segments using cache for incremental LLM review
+        fresh_segments = all_segments
+        if cache:
+            fresh_segments = []
+            for file_path in files:
+                file_key = str(file_path)
+                file_segments = [s for s in all_segments if s.file == file_key]
+                cached_file = cache.files.get(file_key)
+                new_segs, cached_iss = get_cached_llm_issues(file_segments, cached_file)
+                fresh_segments.extend(new_segs)
+                issues.extend(cached_iss)
+            if fresh_segments:
+                print(f"[cache] LLM reviewing {len(fresh_segments)} of {len(all_segments)} segment(s)")
+            else:
+                print(f"[cache] All {len(all_segments)} segment(s) cached, skipping LLM")
+
+        if fresh_segments:
+            if cfg.llm.provider == "ollama":
+                issues += adapters.ollama.run(fresh_segments, cfg, url_env="OLLAMA_URL")
+            elif cfg.llm.provider in ("openai", "lm-studio"):
+                issues += adapters.openai.run(fresh_segments, cfg, url_env="OPENAI_URL")
 
     if args.cmd == "review-fix":
         normalized = [normalize(issue) for issue in issues]
@@ -136,10 +156,10 @@ def main() -> None:
         summary = summarize(accepted)
         result = {"version": "1.0", "summary": summary, "issues": normalized}
         output_json(result, args.json_out)
-        # Save cache for incremental mode
-        new_cache = build_cache_from_results(files, normalized)
+        # Save cache for incremental mode (include segments for LLM caching)
+        new_cache = build_cache_from_results(files, normalized, all_segments)
         save_cache(new_cache, DEFAULT_CACHE_PATH)
-        print(f"[cache] Saved cache for {len(files)} file(s)")
+        print(f"[cache] Saved cache for {len(files)} file(s), {len(all_segments)} segment(s)")
     else:
         normalized = [normalize(issue) for issue in issues]
         active = apply_suppressions(normalized)

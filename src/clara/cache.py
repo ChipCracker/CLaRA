@@ -7,9 +7,12 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
-CACHE_VERSION = "1.0"
+if TYPE_CHECKING:
+    from .extract import Segment
+
+CACHE_VERSION = "1.1"
 DEFAULT_CACHE_PATH = Path("out/.review_cache.json")
 
 
@@ -101,12 +104,39 @@ class CachedLine:
 
 
 @dataclass
+class CachedSegment:
+    """State of an LLM-reviewed segment in the cache."""
+
+    segment_hash: str  # sha256(segment.text)[:16]
+    start_line: int
+    issues: List[CachedIssue] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to dict."""
+        return {
+            "segment_hash": self.segment_hash,
+            "start_line": self.start_line,
+            "issues": [i.to_dict() for i in self.issues],
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "CachedSegment":
+        """Deserialize from dict."""
+        return cls(
+            segment_hash=d["segment_hash"],
+            start_line=d["start_line"],
+            issues=[CachedIssue.from_dict(i) for i in d.get("issues", [])],
+        )
+
+
+@dataclass
 class CachedFile:
     """State of a file in the cache."""
 
     file_hash: str
     line_count: int
     lines: Dict[int, CachedLine] = field(default_factory=dict)
+    segments: Dict[str, CachedSegment] = field(default_factory=dict)  # segment_hash → CachedSegment
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dict."""
@@ -114,6 +144,7 @@ class CachedFile:
             "file_hash": self.file_hash,
             "line_count": self.line_count,
             "lines": {str(k): v.to_dict() for k, v in self.lines.items()},
+            "segments": {k: v.to_dict() for k, v in self.segments.items()},
         }
 
     @classmethod
@@ -123,6 +154,7 @@ class CachedFile:
             file_hash=d["file_hash"],
             line_count=d["line_count"],
             lines={int(k): CachedLine.from_dict(v) for k, v in d.get("lines", {}).items()},
+            segments={k: CachedSegment.from_dict(v) for k, v in d.get("segments", {}).items()},
         )
 
 
@@ -171,6 +203,11 @@ def compute_line_hash(line: str) -> str:
 def compute_file_hash(content: str) -> str:
     """Compute hash of entire file content."""
     return hashlib.sha256(content.encode("utf-8")).hexdigest()[:32]
+
+
+def compute_segment_hash(segment_text: str) -> str:
+    """Compute hash of a segment's text content."""
+    return hashlib.sha256(segment_text.encode("utf-8")).hexdigest()[:16]
 
 
 def load_cache(path: Path = DEFAULT_CACHE_PATH) -> Optional[ReviewCache]:
@@ -307,6 +344,38 @@ def get_lines_needing_check(changes: List[LineChange]) -> Set[int]:
     return {change.current_line for change in changes if change.status == "new"}
 
 
+def get_cached_llm_issues(
+    segments: List["Segment"],
+    cached_file: Optional[CachedFile],
+) -> Tuple[List["Segment"], List[Dict[str, Any]]]:
+    """
+    Filter segments and return cached LLM issues for unchanged segments.
+
+    Returns:
+        - List of segments that need fresh LLM review (new or changed)
+        - List of cached issues for unchanged segments (with updated line numbers)
+    """
+    if cached_file is None:
+        return segments, []
+
+    fresh_segments: List["Segment"] = []
+    cached_issues: List[Dict[str, Any]] = []
+
+    for segment in segments:
+        seg_hash = compute_segment_hash(segment.text)
+
+        if seg_hash in cached_file.segments:
+            cached_seg = cached_file.segments[seg_hash]
+            for cached_issue in cached_seg.issues:
+                cached_issues.append(
+                    cached_issue.to_full_issue(segment.file, segment.start_line)
+                )
+        else:
+            fresh_segments.append(segment)
+
+    return fresh_segments, cached_issues
+
+
 def issue_to_cached(issue: Dict[str, Any]) -> CachedIssue:
     """Convert a full issue dict to CachedIssue."""
     return CachedIssue(
@@ -322,16 +391,46 @@ def issue_to_cached(issue: Dict[str, Any]) -> CachedIssue:
 
 
 def build_cache_from_results(
-    files: List[Path], issues: List[Dict[str, Any]]
+    files: List[Path],
+    issues: List[Dict[str, Any]],
+    segments: Optional[List["Segment"]] = None,
 ) -> ReviewCache:
     """Build new cache from review results."""
     cache = ReviewCache()
 
-    # Index issues by (file, line)
-    issue_index: Dict[Tuple[str, int], List[Dict[str, Any]]] = {}
+    # Separate LLM issues from line-based issues
+    llm_issues: List[Dict[str, Any]] = []
+    line_issues_list: List[Dict[str, Any]] = []
     for issue in issues:
+        if issue.get("tool") == "llm":
+            llm_issues.append(issue)
+        else:
+            line_issues_list.append(issue)
+
+    # Index line-based issues by (file, line)
+    issue_index: Dict[Tuple[str, int], List[Dict[str, Any]]] = {}
+    for issue in line_issues_list:
         key = (issue.get("file", ""), issue.get("line", 0))
         issue_index.setdefault(key, []).append(issue)
+
+    # Index LLM issues by (file, start_line) for segment matching
+    llm_issue_index: Dict[Tuple[str, int], List[Dict[str, Any]]] = {}
+    for issue in llm_issues:
+        key = (issue.get("file", ""), issue.get("line", 0))
+        llm_issue_index.setdefault(key, []).append(issue)
+
+    # Build segment index: segment_hash → (segment, issues)
+    segment_cache: Dict[str, Dict[str, CachedSegment]] = {}  # file → {hash → CachedSegment}
+    if segments:
+        for segment in segments:
+            seg_hash = compute_segment_hash(segment.text)
+            seg_issues = llm_issue_index.get((segment.file, segment.start_line), [])
+            cached_segment = CachedSegment(
+                segment_hash=seg_hash,
+                start_line=segment.start_line,
+                issues=[issue_to_cached(iss) for iss in seg_issues],
+            )
+            segment_cache.setdefault(segment.file, {})[seg_hash] = cached_segment
 
     for file_path in files:
         content = file_path.read_text(encoding="utf-8")
@@ -342,15 +441,16 @@ def build_cache_from_results(
             file_hash=compute_file_hash(content),
             line_count=len(lines),
             lines={},
+            segments=segment_cache.get(file_key, {}),
         )
 
         for i, line in enumerate(lines):
             line_no = i + 1
-            line_issues = issue_index.get((file_key, line_no), [])
+            line_iss = issue_index.get((file_key, line_no), [])
 
             cached_line = CachedLine(
                 content_hash=compute_line_hash(line),
-                issues=[issue_to_cached(iss) for iss in line_issues],
+                issues=[issue_to_cached(iss) for iss in line_iss],
             )
             cached_file.lines[line_no] = cached_line
 
