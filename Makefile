@@ -5,7 +5,7 @@ MODEL ?= mistral
 LT_URL ?= http://localhost:8010
 OLLAMA_URL ?= http://localhost:11434
 
-.PHONY: pull up down review review-auto check debug-check review-fix debug-review-fix fix debug-fix fix-content debug-fix-content annotate debug-annotate build report
+.PHONY: pull up down review review-auto check debug-check review-fix debug-review-fix fix debug-fix fix-content debug-fix-content annotate debug-annotate build pdf report
 
 pull:
 	@docker compose pull || true
@@ -34,6 +34,7 @@ review-fix: debug-review-fix
 
 review-auto:
 	docker compose run --rm core python -m clara.cli review-auto --json out/review.json || (echo "" && cat out/review.json && exit 1)
+	@$(MAKE) pdf
 
 debug-fix:
 	docker compose run --rm core python -m clara.cli fix
@@ -57,6 +58,8 @@ clean:
 
 build:
 	docker compose run --rm core tectonic -X compile tex/main.tex --outdir out
+
+pdf: build
 
 report:
 	jq '.' out/review.json
