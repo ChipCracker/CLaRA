@@ -47,7 +47,7 @@ TEMP_OUT=$(mktemp)
 
 set +e
 # Run check and if it fails, use jq to print a summary from the JSON output
-docker compose run --rm -T core bash -c "python -m clara.cli check --fast --json out/commit_check.json --files $STAGED_FILES || (echo '--- Report ---' && cat out/commit_check.json | python -m json.tool && exit 1)" > "$TEMP_OUT" 2>&1
+docker compose run --rm -T core bash -c "python -m clara.cli check --json out/commit_check.json --files $STAGED_FILES || (echo '--- Report ---' && cat out/commit_check.json | python -m json.tool && exit 1)" > "$TEMP_OUT" 2>&1
 EXIT_CODE=$?
 set -e
 
